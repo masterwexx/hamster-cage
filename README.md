@@ -1,5 +1,6 @@
 # hamster-cage
-code for the hamster cage project
+
+go into code visualization to read the readme
 
 ill be using the arduino IDE;
 first of all you are gonna need an esp32 and a GC9A01 round display.
