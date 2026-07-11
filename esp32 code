@@ -1,0 +1,93 @@
+#include <SPI.h>
+#include <FS.h>
+#include <LittleFS.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_GC9A01A.h>
+
+// Collegamenti ESP32 → Display GC9A01
+#define TFT_CS   5
+#define TFT_DC   2
+#define TFT_RST  4
+
+// Inizializza display
+Adafruit_GC9A01A tft(TFT_CS, TFT_DC, TFT_RST);
+
+// Configurazione immagine
+#define IMG_WIDTH   240
+#define IMG_HEIGHT  240
+#define NUM_FRAMES  9       // imposta il numero effettivo dei tuoi .bin (0–8)
+#define FRAME_DELAY 80      // ms tra un frame e l’altro
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n Avvio ESP32 + GC9A01 con LittleFS");
+
+  if (!LittleFS.begin(true)) {
+    Serial.println(" Errore nel montare LittleFS!");
+    while (1);
+  }
+  Serial.println(" LittleFS montato correttamente.");
+
+  tft.begin();
+  tft.setRotation(0);
+  tft.fillScreen(GC9A01A_BLACK);
+  Serial.println(" Display inizializzato.");
+
+  listFiles();
+}
+
+void loop() {
+  // Loop infinito avanti → indietro
+  for (int i = 0; i < NUM_FRAMES; i++) {
+    String path = "/" + String(i) + ".bin";
+    Serial.print(" Mostro: "); Serial.println(path);
+    drawBin(path.c_str());
+    delay(FRAME_DELAY);
+  }
+  for (int i = NUM_FRAMES - 2; i > 0; i--) {
+    String path = "/" + String(i) + ".bin";
+    Serial.print(" Mostro: "); Serial.println(path);
+    drawBin(path.c_str());
+    delay(FRAME_DELAY);
+  }
+}
+
+// Disegna un file .bin RGB565 sul display
+void drawBin(const char* filename) {
+  File file = LittleFS.open(filename, "r");
+  if (!file) {
+    Serial.print(" File non trovato: ");
+    Serial.println(filename);
+    return;
+  }
+
+  uint16_t rowBuffer[IMG_WIDTH];
+  tft.startWrite();
+  for (int y = 0; y < IMG_HEIGHT; y++) {
+    int bytesRead = file.read((uint8_t*)rowBuffer, sizeof(rowBuffer));
+    if (bytesRead != sizeof(rowBuffer)) {
+      Serial.println(" Lettura incompleta!");
+      break;
+    }
+
+    // Inverti BGR/RGB se i colori sono sballati (decommenta la prossima riga)
+    // for (int x = 0; x < IMG_WIDTH; x++) rowBuffer[x] = (rowBuffer[x] >> 11) | (rowBuffer[x] & 0x07E0) | ((rowBuffer[x] & 0x001F) << 11);
+
+    tft.writePixels(rowBuffer, IMG_WIDTH);
+  }
+  tft.endWrite();
+  file.close();
+}
+
+// Elenco file nel filesystem
+void listFiles() {
+  Serial.println("\n File presenti in LittleFS:");
+  File root = LittleFS.open("/");
+  File file = root.openNextFile();
+  while (file) {
+    Serial.println(file.name());
+    file = root.openNextFile();
+  }
+  Serial.println("---- Fine elenco ----\n");
+}
